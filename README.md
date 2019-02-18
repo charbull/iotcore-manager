@@ -1,1 +1,0 @@
-# iotcore-manager
