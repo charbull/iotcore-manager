@@ -34,7 +34,7 @@ public class MqttExampleOptions {
   String privateKeyFile;
   String algorithm;
   String cloudRegion = "us-central1";
-  int numMessages = 100;
+  int numMessages = 1;
   int tokenExpMins = 20;
   String telemetryData = "Specify with -telemetry_data";
 
