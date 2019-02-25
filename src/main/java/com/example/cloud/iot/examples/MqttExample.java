@@ -42,6 +42,7 @@ import org.joda.time.DateTime;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 // [END iot_mqtt_includes]
+import com.google.instrumentation.trace.Span.Options;
 
 /**
  * Java sample of connecting to Google Cloud IoT Core vice via MQTT, using JWT.
@@ -71,6 +72,7 @@ public class MqttExample {
 	// [START iot_mqtt_jwt]
 	// [START iot_mqtt_configcallback]
 	static MqttCallback mCallback;
+	static String token = null;
 
 	/** Create a Cloud IoT Core JWT for the given project id, signed with the given RSA key. */
 	private static String createJwtRsa(String projectId, String privateKeyFile)
@@ -308,10 +310,12 @@ public class MqttExample {
 				String.format(
 						"projects/%s/locations/%s/registries/%s/devices/%s",
 						options.projectId, options.cloudRegion, options.registryId, options.deviceId);
+		
+		System.out.println("Device Path:\n"+mqttClientId);
 
-		
+
 		Gson gson = new Gson();
-		
+
 		MqttConnectOptions connectOptions = new MqttConnectOptions();
 		// Note that the Google Cloud IoT Core only supports MQTT 3.1.1, and Paho requires that we
 		// explictly set this. If you don't set MQTT version, the server will immediately close its
@@ -329,11 +333,13 @@ public class MqttExample {
 
 		DateTime iat = new DateTime();
 		if (options.algorithm.equals("RS256")) {
+			token = createJwtRsa(options.projectId, options.privateKeyFile);
 			connectOptions.setPassword(
-					createJwtRsa(options.projectId, options.privateKeyFile).toCharArray());
+					token.toCharArray());
 		} else if (options.algorithm.equals("ES256")) {
+			token = createJwtEs(options.projectId, options.privateKeyFile);
 			connectOptions.setPassword(
-					createJwtEs(options.projectId, options.privateKeyFile).toCharArray());
+					token.toCharArray());
 		} else {
 			throw new IllegalArgumentException(
 					"Invalid algorithm " + options.algorithm + ". Should be one of 'RS256' or 'ES256'.");
@@ -350,7 +356,7 @@ public class MqttExample {
 		long maxConnectIntervalMillis = 6000L;
 		long maxConnectRetryTimeElapsedMillis = 900000L;
 		float intervalMultiplier = 1.5f;
-		
+
 		long retryIntervalMs = initialConnectIntervalMillis;
 		long totalRetryTimeMs = 0;
 
@@ -402,11 +408,13 @@ public class MqttExample {
 				System.out.format("\tRefreshing token after: %d seconds\n", secsSinceRefresh);
 				iat = new DateTime();
 				if (options.algorithm.equals("RS256")) {
+					token = createJwtRsa(options.projectId, options.privateKeyFile);
 					connectOptions.setPassword(
-							createJwtRsa(options.projectId, options.privateKeyFile).toCharArray());
+							token.toCharArray());
 				} else if (options.algorithm.equals("ES256")) {
+					token = createJwtEs(options.projectId, options.privateKeyFile);
 					connectOptions.setPassword(
-							createJwtEs(options.projectId, options.privateKeyFile).toCharArray());
+							token.toCharArray());
 				} else {
 					throw new IllegalArgumentException(
 							"Invalid algorithm " + options.algorithm + ". Should be one of 'RS256' or 'ES256'.");
@@ -416,6 +424,7 @@ public class MqttExample {
 				attachCallback(client, options.deviceId);
 			}
 			// [END iot_mqtt_jwt_refresh]
+			System.out.println("Token: "+token+"\n");
 
 			// Publish "payload" to the MQTT topic. qos=1 means at least once delivery. Cloud IoT Core
 			// also supports qos=0 for at most once delivery.
@@ -449,6 +458,10 @@ public class MqttExample {
 		// [END iot_mqtt_publish]
 	}
 
+	private static void downloadFileFromURL(String token, String url) {
+
+	}
+
 	/** Attaches the callback used when configuration changes occur. */
 	public static void attachCallback(MqttClient client, String deviceId) throws MqttException {
 		mCallback =
@@ -462,7 +475,6 @@ public class MqttExample {
 			public void messageArrived(String topic, MqttMessage message) throws Exception {
 				String payload = new String(message.getPayload());
 				Gson gson = new Gson();
-				
 				JsonObject status = new JsonObject();
 				status.addProperty("deviceId", deviceId);
 				System.out.println("Message Arrived : " + payload);
@@ -475,23 +487,29 @@ public class MqttExample {
 					if(input.equalsIgnoreCase("y"))
 					{
 						status.addProperty("fw-state", "downloading");
+
 						sendDataFromDevice(client, deviceId, "state", gson.toJson(status));
+						System.out.print("Would you like to install the new firmware? y/n");
+						input = System.console().readLine();
+						if(input.equalsIgnoreCase("y"))
+						{
+							status.addProperty("fw-state", "installing");
+							sendDataFromDevice(client, deviceId, "state", gson.toJson(status));
+							System.out.print("Would you like to finalize the install the new firmware? y/n");
+							input = System.console().readLine();
+							if(input.equalsIgnoreCase("y")) 
+							{
+								status.addProperty("fw-state", "installed");
+								sendDataFromDevice(client, deviceId, "state", gson.toJson(status));
+							}
+							System.out.println("End of Install");
+						}
 					}
-					System.out.print("Would you like to install the new firmware? y/n");
-					input = System.console().readLine();
-					if(input.equalsIgnoreCase("y"))
-					{
-						status.addProperty("fw-state", "installing");
-						sendDataFromDevice(client, deviceId, "state", gson.toJson(status));
+					else {
+						System.out.println("Firmware ignored");
 					}
-					System.out.print("Would you like to finalize the install the new firmware? y/n");
-					input = System.console().readLine();
-					if(input.equalsIgnoreCase("y")) 
-					{
-						status.addProperty("fw-state", "installed");
-						sendDataFromDevice(client, deviceId, "state", gson.toJson(status));
-					}
-					System.out.println("End of Install");
+
+
 				}          
 			}
 
