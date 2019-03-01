@@ -310,8 +310,8 @@ public class MqttExample {
 				String.format(
 						"projects/%s/locations/%s/registries/%s/devices/%s",
 						options.projectId, options.cloudRegion, options.registryId, options.deviceId);
-		
-		System.out.println("Device Path:\n"+mqttClientId);
+
+		//System.out.println("Device Path:\n"+mqttClientId);
 
 
 		Gson gson = new Gson();
@@ -424,7 +424,7 @@ public class MqttExample {
 				attachCallback(client, options.deviceId);
 			}
 			// [END iot_mqtt_jwt_refresh]
-			System.out.println("Token: "+token+"\n");
+			//System.out.println("Token: "+token+"\n");
 
 			// Publish "payload" to the MQTT topic. qos=1 means at least once delivery. Cloud IoT Core
 			// also supports qos=0 for at most once delivery.
@@ -476,7 +476,6 @@ public class MqttExample {
 				String payload = new String(message.getPayload());
 				Gson gson = new Gson();
 				JsonObject status = new JsonObject();
-				status.addProperty("deviceId", deviceId);
 				System.out.println("Message Arrived : " + payload);
 				if(payload.contains("firmware-update")) {
 					status.addProperty("fw-state", "msg-received");
@@ -501,16 +500,22 @@ public class MqttExample {
 							{
 								status.addProperty("fw-state", "installed");
 								sendDataFromDevice(client, deviceId, "state", gson.toJson(status));
+								System.out.println("End of Install");
 							}
-							System.out.println("End of Install");
-						}
+							else
+							{
+								System.out.println("Ignoring install");
+							}
+
+						} else System.out.println("Ignoring install");
 					}
 					else {
 						System.out.println("Firmware ignored");
 					}
 
-
-				}          
+				}    else {
+					System.out.println("Ignoring payload");
+				}      
 			}
 
 			@Override
